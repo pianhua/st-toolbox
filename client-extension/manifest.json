@@ -1,0 +1,16 @@
+{
+  "display_name": "ST Toolbox",
+  "loading_order": 50,
+  "requires": [],
+  "optional": [],
+  "js": "index.js",
+  "author": "ST Toolbox Contributors",
+  "version": "1.0.0",
+  "description": "Filesystem and shell tools for AI - provides read, write, edit, bash, list_directory, search_files, get_environment, http_request, move_file, delete_file tools",
+  "homePage": "https://github.com/st-toolbox/st-toolbox",
+  "minimum_client_version": "1.12.0",
+  "auto_update": true,
+  "hooks": {
+    "activate": "init"
+  }
+}

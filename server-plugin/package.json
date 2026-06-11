@@ -1,0 +1,13 @@
+{
+  "name": "st-toolbox",
+  "version": "1.0.0",
+  "description": "Filesystem and shell tools for SillyTavern - provides read, write, edit, bash, list_directory, search_files, get_environment, http_request, move_file, delete_file tools",
+  "main": "index.js",
+  "type": "module",
+  "keywords": ["sillytavern", "tools", "filesystem", "shell"],
+  "author": "ST Toolbox",
+  "license": "MIT",
+  "dependencies": {
+    "write-file-atomic": "^4.0.0"
+  }
+}
