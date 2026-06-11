@@ -1,4 +1,4 @@
-import { getContext } from '../../extensions.js';
+import { getContext } from '../../../extensions.js';
 
 const EXTENSION_NAME = 'st-toolbox';
 const API_PREFIX = '/api/plugins/st-toolbox';
