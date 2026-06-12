@@ -1,0 +1,103 @@
+<div class="st-toolbox-settings">
+    <div class="inline-drawer">
+        <div class="inline-drawer-toggle inline-drawer-header">
+            <b>ST Toolbox Settings</b>
+            <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
+        </div>
+        <div class="inline-drawer-content">
+            <div class="st-toolbox-setting-container">
+                <div class="st-toolbox-setting-row">
+                    <label for="st-toolbox-allowed-paths">
+                        <span>Allowed Directories</span>
+                        <small>One path per line. Tools can access these directories in addition to the project directory.</small>
+                    </label>
+                    <textarea 
+                        id="st-toolbox-allowed-paths" 
+                        class="text_pole textarea_compact" 
+                        rows="5" 
+                        placeholder="C:\Users\YourName\Desktop&#10;C:\Users\YourName\Documents&#10;D:\Projects"
+                    ></textarea>
+                </div>
+                <div class="st-toolbox-setting-row">
+                    <div class="st-toolbox-buttons">
+                        <button id="st-toolbox-save" class="menu_button">
+                            <i class="fa-solid fa-save"></i> Save
+                        </button>
+                        <button id="st-toolbox-reload" class="menu_button">
+                            <i class="fa-solid fa-refresh"></i> Reload
+                        </button>
+                    </div>
+                </div>
+                <div id="st-toolbox-status" class="st-toolbox-status"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.st-toolbox-settings {
+    margin: 10px 0;
+}
+
+.st-toolbox-setting-container {
+    padding: 10px;
+}
+
+.st-toolbox-setting-row {
+    margin-bottom: 15px;
+}
+
+.st-toolbox-setting-row label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+.st-toolbox-setting-row label small {
+    display: block;
+    font-weight: normal;
+    opacity: 0.7;
+    margin-top: 3px;
+}
+
+#st-toolbox-allowed-paths {
+    width: 100%;
+    min-height: 100px;
+    font-family: monospace;
+    font-size: 12px;
+    resize: vertical;
+}
+
+.st-toolbox-buttons {
+    display: flex;
+    gap: 10px;
+}
+
+.st-toolbox-status {
+    margin-top: 10px;
+    padding: 8px;
+    border-radius: 4px;
+    display: none;
+}
+
+.st-toolbox-status.success {
+    display: block;
+    background-color: rgba(40, 167, 69, 0.2);
+    border: 1px solid rgba(40, 167, 69, 0.5);
+    color: #28a745;
+}
+
+.st-toolbox-status.error {
+    display: block;
+    background-color: rgba(220, 53, 69, 0.2);
+    border: 1px solid rgba(220, 53, 69, 0.5);
+    color: #dc3545;
+}
+
+.st-toolbox-status.info {
+    display: block;
+    background-color: rgba(23, 162, 184, 0.2);
+    border: 1px solid rgba(23, 162, 184, 0.5);
+    color: #17a2b8;
+}
+</style>

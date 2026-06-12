@@ -1,4 +1,4 @@
-import { getContext } from '../../../extensions.js';
+import { getContext, renderExtensionTemplateAsync } from '../../../extensions.js';
 
 const EXTENSION_NAME = 'st-toolbox';
 const API_PREFIX = '/api/plugins/st-toolbox';
@@ -34,7 +34,113 @@ export async function init() {
     registerMoveFileTool();
     registerDeleteFileTool();
 
+    // Initialize settings UI
+    await initSettingsUI();
+
     console.log(`[${EXTENSION_NAME}] All 10 tools registered successfully`);
+}
+
+/**
+ * Initialize settings UI
+ */
+async function initSettingsUI() {
+    try {
+        // Load settings template
+        const settingsHtml = await renderExtensionTemplateAsync(EXTENSION_NAME, 'settings');
+        
+        // Find the extensions settings container
+        const extensionsSettings = $('#extensions_settings');
+        if (extensionsSettings.length === 0) {
+            console.warn(`[${EXTENSION_NAME}] Extensions settings container not found`);
+            return;
+        }
+
+        // Append our settings
+        extensionsSettings.append(settingsHtml);
+
+        // Load current config
+        await loadConfig();
+
+        // Bind event handlers
+        $('#st-toolbox-save').on('click', saveConfig);
+        $('#st-toolbox-reload').on('click', loadConfig);
+
+        console.log(`[${EXTENSION_NAME}] Settings UI initialized`);
+    } catch (error) {
+        console.error(`[${EXTENSION_NAME}] Failed to initialize settings UI:`, error);
+    }
+}
+
+/**
+ * Load config from server
+ */
+async function loadConfig() {
+    try {
+        const response = await fetch(`${API_PREFIX}/config`, {
+            method: 'GET',
+            headers: getRequestHeaders(),
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to load config: ${response.statusText}`);
+        }
+
+        const config = await response.json();
+        
+        // Update textarea
+        const pathsText = (config.allowedPaths || []).join('\n');
+        $('#st-toolbox-allowed-paths').val(pathsText);
+
+        showStatus('Configuration loaded', 'info');
+    } catch (error) {
+        console.error(`[${EXTENSION_NAME}] Error loading config:`, error);
+        showStatus(`Error: ${error.message}`, 'error');
+    }
+}
+
+/**
+ * Save config to server
+ */
+async function saveConfig() {
+    try {
+        const pathsText = $('#st-toolbox-allowed-paths').val();
+        const allowedPaths = pathsText
+            .split('\n')
+            .map(p => p.trim())
+            .filter(p => p.length > 0);
+
+        const response = await fetch(`${API_PREFIX}/config`, {
+            method: 'POST',
+            headers: getRequestHeaders(),
+            body: JSON.stringify({ allowedPaths }),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || `Failed to save config: ${response.statusText}`);
+        }
+
+        const result = await response.json();
+        showStatus(`Configuration saved! ${result.allowedPaths.length} directories in whitelist.`, 'success');
+    } catch (error) {
+        console.error(`[${EXTENSION_NAME}] Error saving config:`, error);
+        showStatus(`Error: ${error.message}`, 'error');
+    }
+}
+
+/**
+ * Show status message
+ */
+function showStatus(message, type = 'info') {
+    const statusEl = $('#st-toolbox-status');
+    statusEl.text(message);
+    statusEl.removeClass('success error info').addClass(type);
+    statusEl.show();
+
+    // Auto-hide after 3 seconds
+    setTimeout(() => {
+        statusEl.fadeOut();
+    }, 3000);
 }
 
 /**

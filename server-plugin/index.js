@@ -5,7 +5,7 @@ import https from 'node:https';
 import http from 'node:http';
 
 import { sync as writeFileSyncAtomic } from 'write-file-atomic';
-import { getConfigValue } from '../../src/util.js';
+import { getConfigValue, setConfigValue } from '../../src/util.js';
 
 // Import serverDirectory from the correct path
 // Note: This path may need adjustment based on ST's plugin loading mechanism
@@ -492,7 +492,43 @@ export async function init(router) {
         }
     });
 
-    console.log('[ST Toolbox] Server-side plugin initialized with 10 endpoints');
+    // Configuration API endpoints
+    router.get('/config', async (request, response) => {
+        try {
+            const config = getConfigValue('st-toolbox', {});
+            return response.json({
+                allowedPaths: config.allowedPaths || [],
+            });
+        } catch (error) {
+            console.error('[ST Toolbox] Error reading config:', error);
+            return response.status(500).json({ error: 'Failed to read configuration' });
+        }
+    });
+
+    router.post('/config', async (request, response) => {
+        try {
+            const { allowedPaths } = request.body;
+            
+            if (!Array.isArray(allowedPaths)) {
+                return response.status(400).json({ error: 'allowedPaths must be an array' });
+            }
+
+            // Validate paths (basic validation - just check they are strings)
+            const validPaths = allowedPaths
+                .filter(p => typeof p === 'string' && p.trim().length > 0)
+                .map(p => p.trim());
+
+            setConfigValue('st-toolbox.allowedPaths', validPaths);
+
+            console.log('[ST Toolbox] Configuration updated:', validPaths);
+            return response.json({ success: true, allowedPaths: validPaths });
+        } catch (error) {
+            console.error('[ST Toolbox] Error saving config:', error);
+            return response.status(500).json({ error: 'Failed to save configuration' });
+        }
+    });
+
+    console.log('[ST Toolbox] Server-side plugin initialized with 12 endpoints');
 }
 
 export async function exit() {
