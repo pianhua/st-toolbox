@@ -1,15 +1,22 @@
-# ST Toolbox - SillyTavern Extension
+# ST Toolbox
 
-A powerful extension that provides filesystem and shell tools for AI assistants in SillyTavern.
+[English](#english) | [中文](#中文)
+
+---
+
+# English
+
+A powerful extension that provides **filesystem and shell tools** for AI assistants in SillyTavern.
 
 ## Features
 
 - **10 Built-in Tools**: read, write, edit, bash, list_directory, search_files, get_environment, http_request, move_file, delete_file
-- **Windows Support**: PowerShell with UTF-8 encoding for proper Chinese character display
+- **Windows Support**: PowerShell with UTF-8 encoding for proper Chinese/Unicode character display
 - **Safe Deletion**: Files are moved to trash by default (recoverable)
 - **Path Security**: All file operations are restricted to the SillyTavern project directory
+- **AI Tool Calling**: Integrates with SillyTavern's tool calling framework
 
-## Installation
+## Quick Install
 
 ### Prerequisites
 
@@ -21,17 +28,15 @@ A powerful extension that provides filesystem and shell tools for AI assistants 
 1. Open SillyTavern in your browser
 2. Navigate to the **Extensions** panel (sidebar)
 3. Click the **"Install extension"** button (cloud download icon)
-4. Enter the Git repository URL: `https://github.com/st-toolbox/st-toolbox`
+4. Enter the Git repository URL: `https://github.com/pianhua/st-toolbox`
 5. Click **"Install"** (or "Install just for me" / "Install for all users" for admin users)
 6. Wait for installation to complete
-7. **Reload the page** to activate the extension
 
 ### Step 2: Install Server Plugin
 
-The server plugin provides the actual file system and shell operations. You need to install it manually:
-
-1. Copy the `server-plugin/` directory to your SillyTavern installation's `plugins/` directory
-2. The final structure should be:
+1. Download or clone this repository
+2. Copy the `server-plugin/` directory to your SillyTavern's `plugins/st-toolbox/` directory
+3. The final structure should be:
    ```
    SillyTavern/
    ├── plugins/
@@ -39,7 +44,13 @@ The server plugin provides the actual file system and shell operations. You need
    │       ├── index.js
    │       ├── package.json
    │       └── README.md
-   └── ...
+   └── public/
+       └── scripts/
+           └── extensions/
+               └── third-party/
+                   └── st-toolbox/
+                       ├── manifest.json
+                       └── index.js
    ```
 
 ### Step 3: Enable Server Plugins
@@ -48,7 +59,6 @@ Edit your `config.yaml` file in the SillyTavern root directory:
 
 ```yaml
 enableServerPlugins: true
-enableServerPluginsAutoUpdate: true
 ```
 
 ### Step 4: Restart SillyTavern
@@ -58,165 +68,166 @@ Restart the SillyTavern server to load the server plugin.
 ### Step 5: Verify Installation
 
 1. Open SillyTavern in your browser
-2. Open browser Developer Tools (F12)
-3. Check the Console for `[ST Toolbox]` messages
-4. The extension should appear in the Extensions settings
+2. Open browser Developer Tools (F12) → Console
+3. Look for `[ST Toolbox]` messages:
+   ```
+   [ST Toolbox] Initializing client-side extension...
+   [ST Toolbox] All 10 tools registered successfully
+   ```
 
 ## Available Tools
 
-### 1. read_file
-Reads the content of a file from the server.
-
-**Parameters:**
-- `filePath` (required): Absolute path to the file to read
-- `offset` (optional): Line number to start reading from (1-based)
-- `limit` (optional): Maximum number of lines to read
-
-### 2. write_file
-Writes content to a file on the server. Overwrites the file if it exists.
-
-**Parameters:**
-- `filePath` (required): Absolute path to the file to write
-- `content` (required): Content to write to the file
-
-### 3. edit_file
-Edits a file on the server by replacing oldText with newText.
-
-**Parameters:**
-- `filePath` (required): Absolute path to the file to edit
-- `oldText` (required): Text to find and replace
-- `newText` (required): Text to replace oldText with
-
-### 4. execute_bash
-Executes a bash command on the server.
-
-**Parameters:**
-- `command` (required): Bash command to execute
-- `timeout` (optional): Timeout in milliseconds (default: 30000)
-
-### 5. list_directory
-Lists all files and directories in a given path.
-
-**Parameters:**
-- `dirPath` (required): Path to the directory to list
-
-### 6. search_files
-Searches for text patterns within files using regular expressions.
-
-**Parameters:**
-- `query` (required): Regular expression pattern to search for
-- `path` (optional): Directory path to search in
-- `pattern` (optional): File name pattern to filter by (e.g., "*.js")
-
-### 7. get_environment
-Retrieves information about the server environment.
-
-**Parameters:** None
-
-### 8. http_request
-Makes HTTP/HTTPS requests to external APIs or websites.
-
-**Parameters:**
-- `url` (required): URL to request
-- `method` (optional): HTTP method (GET, POST, PUT, DELETE)
-- `headers` (optional): Custom headers as key-value pairs
-- `body` (optional): Request body for POST/PUT
-
-### 9. move_file
-Moves or renames a file or directory.
-
-**Parameters:**
-- `sourcePath` (required): Source file or directory path
-- `destinationPath` (required): Destination path
-
-### 10. delete_file
-Safely deletes a file or directory.
-
-**Parameters:**
-- `filePath` (required): Path to file or directory to delete
-- `permanent` (optional): Set to true for permanent deletion (default: false)
-
-**Note:** By default, files are moved to trash (recoverable). Use `permanent: true` for permanent deletion.
+| Tool | Description | Parameters |
+|------|-------------|------------|
+| `read_file` | Read file content | `filePath`, `offset?`, `limit?` |
+| `write_file` | Write content to file | `filePath`, `content` |
+| `edit_file` | Replace text in file | `filePath`, `oldText`, `newText` |
+| `execute_bash` | Execute shell command | `command`, `timeout?` |
+| `list_directory` | List directory contents | `dirPath` |
+| `search_files` | Search files with regex | `query`, `path?`, `pattern?` |
+| `get_environment` | Get server environment info | None |
+| `http_request` | Make HTTP requests | `url`, `method?`, `headers?`, `body?` |
+| `move_file` | Move/rename file | `sourcePath`, `destinationPath` |
+| `delete_file` | Delete file (safe by default) | `filePath`, `permanent?` |
 
 ## Multi-Swipe Limitation
 
-**Important:** If you have "Function Calling" enabled in SillyTavern settings, the `multi-swipe` feature (n > 1) will be automatically disabled. This is because multi-swipe and tool calling are architecturally incompatible.
-
-**Workaround:** If you need multi-swipe, disable "Function Calling" in settings.
+If "Function Calling" is enabled in SillyTavern settings, the `multi-swipe` feature (n > 1) will be automatically disabled. This is because multi-swipe and tool calling are architecturally incompatible.
 
 ## Troubleshooting
 
-### Tools not appearing
-
-1. Check if `enableServerPlugins: true` is set in `config.yaml`
-2. Check browser console for `[ST Toolbox]` messages
-3. Verify both client extension and server plugin are installed
-4. Restart SillyTavern after installing the server plugin
-
-### Permission errors
-
-1. Ensure the SillyTavern process has read/write permissions to the project directory
-2. Check if the file path is within the project directory (security restriction)
-
-### PowerShell encoding issues (Windows)
-
-The extension automatically uses PowerShell with UTF-8 encoding. If you still see garbled characters:
-
-1. Open PowerShell as Administrator
-2. Run: `chcp 65001`
-3. Restart SillyTavern
+| Problem | Solution |
+|---------|----------|
+| Extension not loading | Check browser Console for errors; hard refresh (Ctrl+Shift+R) |
+| Tools not appearing | Verify `enableServerPlugins: true` in config.yaml |
+| Permission errors | Ensure ST has read/write access to project directory |
+| Garbled characters (Windows) | Run `chcp 65001` in PowerShell as Administrator |
 
 ## Uninstallation
 
-### Remove Client Extension
-
-1. Open SillyTavern Extensions panel
-2. Find "ST Toolbox" in the list
-3. Click the delete button (trash icon)
-4. Confirm deletion
-
-### Remove Server Plugin
-
-1. Delete the `plugins/st-toolbox/` directory from your SillyTavern installation
-2. Set `enableServerPlugins: false` in `config.yaml` (optional)
+1. Delete `plugins/st-toolbox/` from SillyTavern
+2. Delete `public/scripts/extensions/third-party/st-toolbox/` from SillyTavern
 3. Restart SillyTavern
-
-## Directory Structure
-
-```
-st-toolbox/
-├── client-extension/          # Client-side extension (install via Git URL)
-│   ├── manifest.json
-│   └── index.js
-├── server-plugin/             # Server-side plugin (manual installation)
-│   ├── index.js
-│   ├── package.json
-│   └── README.md
-└── README.md                  # This file
-```
-
-## Development
-
-### Building from Source
-
-1. Clone this repository
-2. Copy `client-extension/` to `public/scripts/extensions/third-party/st-toolbox/`
-3. Copy `server-plugin/` to `plugins/st-toolbox/`
-4. Enable server plugins in `config.yaml`
-5. Restart SillyTavern
-
-### Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
 
 ## License
 
-MIT License - feel free to modify and distribute.
+MIT License
 
-## Support
+---
 
-For issues or feature requests, please open an issue on the GitHub repository.
+# 中文
+
+为 SillyTavern AI 助手提供**文件系统和 Shell 工具**的强大扩展。
+
+## 功能特点
+
+- **10 个内置工具**：读取、写入、编辑、执行命令、列出目录、搜索文件、获取环境信息、HTTP 请求、移动文件、删除文件
+- **Windows 支持**：使用 PowerShell + UTF-8 编码，正确显示中文字符
+- **安全删除**：文件默认移动到回收站（可恢复）
+- **路径安全**：所有文件操作限制在 SillyTavern 项目目录内
+- **AI 工具调用**：与 SillyTavern 的工具调用框架集成
+
+## 快速安装
+
+### 前置条件
+
+- SillyTavern v1.12.0 或更高版本
+- 服务器已安装 Git
+
+### 第一步：安装客户端扩展
+
+1. 在浏览器中打开 SillyTavern
+2. 点击左侧边栏的 **Extensions（扩展）** 面板
+3. 点击 **"Install extension"（安装扩展）** 按钮（云下载图标）
+4. 输入 Git 仓库地址：`https://github.com/pianhua/st-toolbox`
+5. 点击 **"Install"（安装）**
+6. 等待安装完成
+
+### 第二步：安装服务端插件
+
+1. 下载或克隆本仓库
+2. 将 `server-plugin/` 目录复制到 SillyTavern 的 `plugins/st-toolbox/` 目录
+3. 最终目录结构如下：
+   ```
+   SillyTavern/
+   ├── plugins/
+   │   └── st-toolbox/
+   │       ├── index.js
+   │       ├── package.json
+   │       └── README.md
+   └── public/
+       └── scripts/
+           └── extensions/
+               └── third-party/
+                   └── st-toolbox/
+                       ├── manifest.json
+                       └── index.js
+   ```
+
+### 第三步：启用服务端插件
+
+编辑 SillyTavern 根目录下的 `config.yaml` 文件：
+
+```yaml
+enableServerPlugins: true
+```
+
+### 第四步：重启 SillyTavern
+
+重启 SillyTavern 服务以加载服务端插件。
+
+### 第五步：验证安装
+
+1. 在浏览器中打开 SillyTavern
+2. 打开浏览器开发者工具（F12）→ Console（控制台）
+3. 查看是否有以下日志：
+   ```
+   [ST Toolbox] Initializing client-side extension...
+   [ST Toolbox] All 10 tools registered successfully
+   ```
+
+## 可用工具
+
+| 工具 | 说明 | 参数 |
+|------|------|------|
+| `read_file` | 读取文件内容 | `filePath`, `offset?`, `limit?` |
+| `write_file` | 写入文件内容 | `filePath`, `content` |
+| `edit_file` | 替换文件中的文本 | `filePath`, `oldText`, `newText` |
+| `execute_bash` | 执行 Shell 命令 | `command`, `timeout?` |
+| `list_directory` | 列出目录内容 | `dirPath` |
+| `search_files` | 使用正则搜索文件 | `query`, `path?`, `pattern?` |
+| `get_environment` | 获取服务器环境信息 | 无 |
+| `http_request` | 发送 HTTP 请求 | `url`, `method?`, `headers?`, `body?` |
+| `move_file` | 移动/重命名文件 | `sourcePath`, `destinationPath` |
+| `delete_file` | 删除文件（默认安全模式） | `filePath`, `permanent?` |
+
+## Multi-Swipe 限制
+
+如果在 SillyTavern 设置中启用了"函数调用"（Function Calling），`multi-swipe` 功能（n > 1）将被自动禁用。这是因为 multi-swipe 和工具调用在架构上不兼容。
+
+## 常见问题
+
+| 问题 | 解决方案 |
+|------|----------|
+| 扩展加载失败 | 检查浏览器 Console 错误信息；强制刷新（Ctrl+Shift+R） |
+| 工具未出现 | 确认 config.yaml 中 `enableServerPlugins: true` |
+| 权限错误 | 确保 SillyTavern 对项目目录有读写权限 |
+| 中文乱码（Windows） | 以管理员身份运行 PowerShell，执行 `chcp 65001` |
+
+## 卸载方法
+
+1. 删除 SillyTavern 目录下的 `plugins/st-toolbox/`
+2. 删除 SillyTavern 目录下的 `public/scripts/extensions/third-party/st-toolbox/`
+3. 重启 SillyTavern
+
+## 许可证
+
+MIT 许可证
+
+---
+
+## Support / 支持
+
+For issues or feature requests, please open an issue on the [GitHub repository](https://github.com/pianhua/st-toolbox).
+
+如有问题或功能建议，请在 [GitHub 仓库](https://github.com/pianhua/st-toolbox)提交 Issue。
