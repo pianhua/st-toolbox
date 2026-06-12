@@ -90,6 +90,24 @@ Restart the SillyTavern server to load the server plugin.
 | `move_file` | Move/rename file | `sourcePath`, `destinationPath` |
 | `delete_file` | Delete file (safe by default) | `filePath`, `permanent?` |
 
+## Whitelist Directories Configuration
+
+By default, tools can only access files within the SillyTavern project directory. To allow access to additional directories, add them to `config.yaml`:
+
+```yaml
+# ST Toolbox configuration
+st-toolbox:
+  # Additional directories that the tools can access
+  # Use absolute paths, one per line
+  allowedPaths:
+    - "C:\\Users\\YourName\\Desktop"
+    - "C:\\Users\\YourName\\Documents"
+    - "C:\\Users\\YourName\\Downloads"
+    - "D:\\Projects"
+```
+
+After editing, restart SillyTavern to apply changes.
+
 ## Multi-Swipe Limitation
 
 If "Function Calling" is enabled in SillyTavern settings, the `multi-swipe` feature (n > 1) will be automatically disabled. This is because multi-swipe and tool calling are architecturally incompatible.
@@ -200,6 +218,24 @@ enableServerPlugins: true
 | `http_request` | 发送 HTTP 请求 | `url`, `method?`, `headers?`, `body?` |
 | `move_file` | 移动/重命名文件 | `sourcePath`, `destinationPath` |
 | `delete_file` | 删除文件（默认安全模式） | `filePath`, `permanent?` |
+
+## 白名单目录配置
+
+默认情况下，工具只能访问 SillyTavern 项目目录内的文件。要允许访问其他目录，请在 `config.yaml` 中添加白名单：
+
+```yaml
+# ST Toolbox 配置
+st-toolbox:
+  # 允许工具访问的额外目录
+  # 使用绝对路径，每行一个
+  allowedPaths:
+    - "C:\\Users\\你的用户名\\Desktop"
+    - "C:\\Users\\你的用户名\\Documents"
+    - "C:\\Users\\你的用户名\\Downloads"
+    - "D:\\Projects"
+```
+
+修改后，重启 SillyTavern 以应用更改。
 
 ## Multi-Swipe 限制
 

@@ -5,6 +5,7 @@ import https from 'node:https';
 import http from 'node:http';
 
 import { sync as writeFileSyncAtomic } from 'write-file-atomic';
+import { getConfigValue } from '../../src/util.js';
 
 // Import serverDirectory from the correct path
 // Note: This path may need adjustment based on ST's plugin loading mechanism
@@ -27,6 +28,19 @@ export const info = {
 const MAX_OUTPUT_SIZE = 256 * 1024;
 const DEFAULT_TIMEOUT = 30000;
 
+// Load allowed paths from config.yaml
+function getAllowedPaths() {
+    try {
+        const config = getConfigValue('st-toolbox', {});
+        const allowedPaths = config.allowedPaths || [];
+        // Normalize all paths
+        return allowedPaths.map(p => path.normalize(path.resolve(p)));
+    } catch (error) {
+        console.warn('[ST Toolbox] Could not load allowedPaths config:', error.message);
+        return [];
+    }
+}
+
 function validatePath(filePath) {
     if (!filePath) {
         return { error: 'No path specified' };
@@ -45,10 +59,20 @@ function validatePath(filePath) {
     const normalizedResolved = path.normalize(resolvedPath);
     const normalizedServerDir = path.normalize(serverDirectory);
 
-    if (!normalizedResolved.startsWith(normalizedServerDir)) {
-        return { error: 'Invalid path' };
+    // Check if path is within serverDirectory
+    if (normalizedResolved.startsWith(normalizedServerDir)) {
+        return { resolvedPath };
     }
-    return { resolvedPath };
+
+    // Check if path is within any allowed path
+    const allowedPaths = getAllowedPaths();
+    for (const allowedPath of allowedPaths) {
+        if (normalizedResolved.startsWith(allowedPath)) {
+            return { resolvedPath };
+        }
+    }
+
+    return { error: 'Invalid path: access denied' };
 }
 
 export async function init(router) {
