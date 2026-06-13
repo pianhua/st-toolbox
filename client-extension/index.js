@@ -1,6 +1,6 @@
 import { getContext, renderExtensionTemplateAsync } from '../../../extensions.js';
 
-const EXTENSION_NAME = 'st-toolbox';
+const EXTENSION_NAME = 'third-party/st-toolbox';
 const API_PREFIX = '/api/plugins/st-toolbox';
 
 let context;
@@ -45,18 +45,32 @@ export async function init() {
  */
 async function initSettingsUI() {
     try {
+        console.log(`[${EXTENSION_NAME}] Initializing settings UI...`);
+        
         // Load settings template
+        console.log(`[${EXTENSION_NAME}] Loading template 'settings'...`);
         const settingsHtml = await renderExtensionTemplateAsync(EXTENSION_NAME, 'settings');
+        console.log(`[${EXTENSION_NAME}] Template loaded successfully`);
         
         // Find the extensions settings container
         const extensionsSettings = $('#extensions_settings');
+        console.log(`[${EXTENSION_NAME}] Found #extensions_settings:`, extensionsSettings.length);
+        
         if (extensionsSettings.length === 0) {
-            console.warn(`[${EXTENSION_NAME}] Extensions settings container not found`);
-            return;
+            console.warn(`[${EXTENSION_NAME}] Extensions settings container not found, trying #extensions_settings2`);
+            const extensionsSettings2 = $('#extensions_settings2');
+            if (extensionsSettings2.length > 0) {
+                extensionsSettings2.append(settingsHtml);
+                console.log(`[${EXTENSION_NAME}] Appended to #extensions_settings2`);
+            } else {
+                console.error(`[${EXTENSION_NAME}] No extensions settings container found`);
+                return;
+            }
+        } else {
+            // Append our settings
+            extensionsSettings.append(settingsHtml);
+            console.log(`[${EXTENSION_NAME}] Appended to #extensions_settings`);
         }
-
-        // Append our settings
-        extensionsSettings.append(settingsHtml);
 
         // Load current config
         await loadConfig();
@@ -65,9 +79,10 @@ async function initSettingsUI() {
         $('#st-toolbox-save').on('click', saveConfig);
         $('#st-toolbox-reload').on('click', loadConfig);
 
-        console.log(`[${EXTENSION_NAME}] Settings UI initialized`);
+        console.log(`[${EXTENSION_NAME}] Settings UI initialized successfully`);
     } catch (error) {
         console.error(`[${EXTENSION_NAME}] Failed to initialize settings UI:`, error);
+        console.error(`[${EXTENSION_NAME}] Error stack:`, error.stack);
     }
 }
 
