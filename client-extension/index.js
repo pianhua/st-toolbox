@@ -97,7 +97,7 @@ async function loadConfig() {
         });
 
         if (!response.ok) {
-            throw new Error(`Failed to load config: ${response.statusText}`);
+            throw new Error(`加载配置失败: ${response.statusText}`);
         }
 
         const config = await response.json();
@@ -106,10 +106,10 @@ async function loadConfig() {
         const pathsText = (config.allowedPaths || []).join('\n');
         $('#st-toolbox-allowed-paths').val(pathsText);
 
-        showStatus('Configuration loaded', 'info');
+        showStatus('配置已加载', 'info');
     } catch (error) {
         console.error(`[${EXTENSION_NAME}] Error loading config:`, error);
-        showStatus(`Error: ${error.message}`, 'error');
+        showStatus(`错误: ${error.message}`, 'error');
     }
 }
 
@@ -132,14 +132,14 @@ async function saveConfig() {
 
         if (!response.ok) {
             const errorData = await response.json();
-            throw new Error(errorData.error || `Failed to save config: ${response.statusText}`);
+            throw new Error(errorData.error || `保存配置失败: ${response.statusText}`);
         }
 
         const result = await response.json();
-        showStatus(`Configuration saved! ${result.allowedPaths.length} directories in whitelist.`, 'success');
+        showStatus(`配置已保存！白名单中有 ${result.allowedPaths.length} 个目录。`, 'success');
     } catch (error) {
         console.error(`[${EXTENSION_NAME}] Error saving config:`, error);
-        showStatus(`Error: ${error.message}`, 'error');
+        showStatus(`错误: ${error.message}`, 'error');
     }
 }
 

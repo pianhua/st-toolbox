@@ -1,30 +1,30 @@
 <div class="st-toolbox-settings">
     <div class="inline-drawer">
         <div class="inline-drawer-toggle inline-drawer-header">
-            <b>ST Toolbox Settings</b>
+            <b>ST Toolbox 设置</b>
             <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
         </div>
         <div class="inline-drawer-content">
             <div class="st-toolbox-setting-container">
                 <div class="st-toolbox-setting-row">
                     <label for="st-toolbox-allowed-paths">
-                        <span>Allowed Directories</span>
-                        <small>One path per line. Tools can access these directories in addition to the project directory.</small>
+                        <span>白名单目录</span>
+                        <small>每行一个目录路径。工具可以访问这些目录（项目目录默认可访问）。</small>
                     </label>
                     <textarea 
                         id="st-toolbox-allowed-paths" 
                         class="text_pole textarea_compact" 
                         rows="5" 
-                        placeholder="C:\Users\YourName\Desktop&#10;C:\Users\YourName\Documents&#10;D:\Projects"
+                        placeholder="C:\Users\你的用户名\Desktop&#10;C:\Users\你的用户名\Documents&#10;D:\Projects"
                     ></textarea>
                 </div>
                 <div class="st-toolbox-setting-row">
                     <div class="st-toolbox-buttons">
                         <button id="st-toolbox-save" class="menu_button">
-                            <i class="fa-solid fa-save"></i> Save
+                            <i class="fa-solid fa-save"></i> 保存
                         </button>
                         <button id="st-toolbox-reload" class="menu_button">
-                            <i class="fa-solid fa-refresh"></i> Reload
+                            <i class="fa-solid fa-refresh"></i> 重新加载
                         </button>
                     </div>
                 </div>
