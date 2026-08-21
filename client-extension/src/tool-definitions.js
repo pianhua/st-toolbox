@@ -1,4 +1,4 @@
-export function createToolDefinitions(apiPrefix, getHeaders, logCallback) {
+export function createToolDefinitions(apiPrefix, getHeaders, logCallback, configProvider) {
     const callApi = async (endpoint, payload) => {
         const startTime = Date.now();
         try {
@@ -34,7 +34,7 @@ export function createToolDefinitions(apiPrefix, getHeaders, logCallback) {
         {
             name: 'read_file',
             displayName: 'Read File',
-            description: 'Reads content from a file within allowed directories. Supports line offset, limit, and line numbers.',
+            description: 'Reads content from a file within allowed directories. Supports line offset, limit, line numbers, and encoding detection.',
             parameters: {
                 type: 'object',
                 properties: {
@@ -54,7 +54,7 @@ export function createToolDefinitions(apiPrefix, getHeaders, logCallback) {
         {
             name: 'write_file',
             displayName: 'Write File',
-            description: 'Writes or overwrites content to a file atomically. Automatically creates parent directories.',
+            description: 'Writes or overwrites content to a file atomically. Automatically creates parent directories and backup snapshot.',
             parameters: {
                 type: 'object',
                 properties: {
@@ -66,34 +66,34 @@ export function createToolDefinitions(apiPrefix, getHeaders, logCallback) {
             },
             action: async (args) => {
                 const res = await callApi('/write', args);
-                return `File written successfully (${res.bytesWritten} bytes written).`;
+                return `File written successfully (${res.bytesWritten} bytes written). Backup created: ${res.backupCreated}`;
             },
             formatMessage: (args) => `Writing file: ${args.filePath}`,
         },
         {
             name: 'edit_file',
             displayName: 'Edit File',
-            description: 'Replaces exact text within a file. Validates match count to prevent accidental replacement.',
+            description: 'Replaces target text within a file using intelligent fuzzy matching and whitespace tolerance. Validates match count to prevent accidental replacement.',
             parameters: {
                 type: 'object',
                 properties: {
                     filePath: { type: 'string', description: 'Path to the file to edit' },
-                    oldText: { type: 'string', description: 'Exact string to find and replace' },
-                    newText: { type: 'string', description: 'New string to insert in place of oldText' },
+                    oldText: { type: 'string', description: 'Exact string or code block to find and replace' },
+                    newText: { type: 'string', description: 'New string or code block to insert in place of oldText' },
                     expectedReplacements: { type: 'number', description: 'Expected number of occurrences to replace (default: 1)' },
                 },
                 required: ['filePath', 'oldText', 'newText'],
             },
             action: async (args) => {
                 const res = await callApi('/edit', args);
-                return `File edited successfully (${res.replacedCount} replacement(s) made).`;
+                return `File edited successfully (${res.replacedCount} replacement(s) made using ${res.strategy} strategy, confidence: ${res.confidence}).`;
             },
             formatMessage: (args) => `Editing file: ${args.filePath}`,
         },
         {
             name: 'patch_file',
             displayName: 'Patch File',
-            description: 'Applies multiple targeted chunk replacements / patches to a file in a single atomic operation.',
+            description: 'Applies multiple targeted chunk replacements or a unified diff to a file in a single atomic operation.',
             parameters: {
                 type: 'object',
                 properties: {
@@ -110,12 +110,13 @@ export function createToolDefinitions(apiPrefix, getHeaders, logCallback) {
                             required: ['oldText', 'newText'],
                         },
                     },
+                    diff: { type: 'string', description: 'Optional Unified Diff string (starting with @@ -line,count +line,count @@)' },
                 },
-                required: ['filePath', 'patches'],
+                required: ['filePath'],
             },
             action: async (args) => {
                 const res = await callApi('/patch', args);
-                return `File patched successfully (${res.patchesApplied} patches applied).`;
+                return `File patched successfully (${res.patchesApplied || 1} patch(es) applied).`;
             },
             formatMessage: (args) => `Patching file: ${args.filePath}`,
         },
@@ -174,7 +175,7 @@ export function createToolDefinitions(apiPrefix, getHeaders, logCallback) {
                 if (res.permanent) {
                     return `Permanently deleted: ${res.filePath}`;
                 }
-                return `Safely moved to trash: ${res.originalPath} (Trash ID: ${res.trashId})`;
+                return `Safely moved to trash: ${res.originalPath} (Trash ID: ${res.trashId}). Can be restored using restore_file.`;
             },
             formatMessage: (args) => `Deleting: ${args.filePath}${args.permanent ? ' (permanent)' : ''}`,
         },
@@ -191,7 +192,7 @@ export function createToolDefinitions(apiPrefix, getHeaders, logCallback) {
             },
             action: async (args) => {
                 const res = await callApi('/restore', args);
-                return `Restored: ${res.restoredPath}`;
+                return `Restored file to: ${res.restoredPath}`;
             },
             formatMessage: (args) => `Restoring trashed item: ${args.identifier}`,
         },
@@ -219,7 +220,7 @@ export function createToolDefinitions(apiPrefix, getHeaders, logCallback) {
         {
             name: 'search_files',
             displayName: 'Search Files',
-            description: 'Searches for text or regex pattern across files in a directory, returning matched lines and line numbers.',
+            description: 'High-speed ripgrep-style search for text or regex patterns across files in a directory, returning matched lines and line numbers.',
             parameters: {
                 type: 'object',
                 properties: {
@@ -263,7 +264,7 @@ export function createToolDefinitions(apiPrefix, getHeaders, logCallback) {
         {
             name: 'execute_bash',
             displayName: 'Execute Command',
-            description: 'Executes shell/PowerShell commands on the host. Automatically handles UTF-8 encoding on Windows.',
+            description: 'Executes shell/PowerShell commands on the host. Automatically handles UTF-8 encoding on Windows and supports background daemon execution.',
             parameters: {
                 type: 'object',
                 properties: {
@@ -271,12 +272,16 @@ export function createToolDefinitions(apiPrefix, getHeaders, logCallback) {
                     args: { type: 'array', items: { type: 'string' }, description: 'Command arguments array' },
                     cwd: { type: 'string', description: 'Working directory (must be inside allowed whitelist directories)' },
                     timeout: { type: 'number', description: 'Execution timeout in milliseconds (default: 30000)' },
-                    shell: { type: 'string', enum: ['powershell', 'cmd', 'bash'], description: 'Specific shell to use (default: powershell on Windows, bash on Unix)' },
+                    shell: { type: 'string', enum: ['powershell', 'cmd', 'bash'], description: 'Specific shell to use' },
+                    isDaemon: { type: 'boolean', description: 'Set true to run in background as a task without waiting' },
                 },
                 required: ['command'],
             },
             action: async (args) => {
                 const res = await callApi('/bash', args);
+                if (res.status === 'running_background') {
+                    return res.message;
+                }
                 let out = res.output || '';
                 if (res.exitCode !== 0) out += `\n[Process exited with code ${res.exitCode}]`;
                 if (res.timedOut) out += '\n[Process timed out]';
@@ -284,6 +289,35 @@ export function createToolDefinitions(apiPrefix, getHeaders, logCallback) {
                 return out;
             },
             formatMessage: (args) => `Executing command: ${args.command}`,
+        },
+        {
+            name: 'manage_task',
+            displayName: 'Manage Task',
+            description: 'Manages background process tasks (status, kill, list).',
+            parameters: {
+                type: 'object',
+                properties: {
+                    action: { type: 'string', enum: ['list', 'status', 'kill'], description: 'Action to perform' },
+                    taskId: { type: 'string', description: 'Task ID (required for status and kill)' },
+                },
+                required: ['action'],
+            },
+            action: async (args) => {
+                if (args.action === 'list') {
+                    const res = await fetch(`${apiPrefix}/tasks`, {
+                        headers: getHeaders ? getHeaders() : {},
+                    });
+                    const list = await res.json();
+                    return JSON.stringify(list, null, 2);
+                } else if (args.action === 'kill') {
+                    const res = await callApi('/task/kill', { taskId: args.taskId });
+                    return JSON.stringify(res, null, 2);
+                } else {
+                    const res = await callApi('/task/status', { taskId: args.taskId });
+                    return JSON.stringify(res, null, 2);
+                }
+            },
+            formatMessage: (args) => `Managing task: ${args.action} ${args.taskId || ''}`,
         },
 
         // ================= 4. NETWORK & WEBPAGE =================

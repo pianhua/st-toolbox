@@ -2,6 +2,7 @@ import path from 'node:path';
 import { ConfigStore } from './lib/config-store.js';
 import { SecuritySandbox } from './lib/security-sandbox.js';
 import { TrashManager } from './lib/trash-manager.js';
+import { FileLockManager } from './lib/file-lock.js';
 import { FileEngine } from './lib/tools/file-engine.js';
 import { SearchEngine } from './lib/tools/search-engine.js';
 import { ProcessEngine } from './lib/tools/process-engine.js';
@@ -22,17 +23,18 @@ try {
 export const info = {
     id: 'st-toolbox',
     name: 'ST Toolbox v2.0',
-    description: 'High-performance AI Tool Calling suite with sandboxed filesystem, diff patching, fast search, shell execution, webpage scraping, and system diagnostics for SillyTavern.',
+    description: 'Industrial-grade AI Tool Calling suite with sandboxed filesystem, diff patching, concurrency locks, fast search, shell execution, webpage scraping, and system diagnostics for SillyTavern.',
 };
 
 export async function init(router) {
-    console.log('[ST-Toolbox v2.0] Initializing server plugin in:', serverDirectory);
+    console.log('[ST-Toolbox v2.0] Initializing industrial-grade server plugin in:', serverDirectory);
 
     const configStore = new ConfigStore(serverDirectory);
     const sandbox = new SecuritySandbox(serverDirectory, configStore);
     const trashManager = new TrashManager(serverDirectory);
+    const fileLockManager = new FileLockManager();
 
-    const fileEngine = new FileEngine(sandbox, trashManager, configStore);
+    const fileEngine = new FileEngine(sandbox, trashManager, configStore, fileLockManager);
     const searchEngine = new SearchEngine(sandbox, configStore);
     const processEngine = new ProcessEngine(sandbox, configStore, serverDirectory);
     const netEngine = new NetEngine(configStore);
@@ -80,6 +82,33 @@ export async function init(router) {
             const { identifier } = req.body;
             const result = trashManager.restore(identifier);
             res.json(result);
+        } catch (err) {
+            res.status(400).json({ error: err.message });
+        }
+    });
+
+    // ================= TASK / PROCESS MANAGEMENT =================
+    router.get('/tasks', async (req, res) => {
+        try {
+            res.json(processEngine.listTasks());
+        } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+    });
+
+    router.post('/task/status', async (req, res) => {
+        try {
+            const { taskId } = req.body;
+            res.json(processEngine.getTask(taskId));
+        } catch (err) {
+            res.status(404).json({ error: err.message });
+        }
+    });
+
+    router.post('/task/kill', async (req, res) => {
+        try {
+            const { taskId } = req.body;
+            res.json(processEngine.killTask(taskId));
         } catch (err) {
             res.status(400).json({ error: err.message });
         }
@@ -225,7 +254,7 @@ export async function init(router) {
         }
     });
 
-    console.log('[ST-Toolbox v2.0] Plugin loaded with 15 endpoints.');
+    console.log('[ST-Toolbox v2.0] Plugin loaded with 18 endpoints.');
 }
 
 export async function exit() {

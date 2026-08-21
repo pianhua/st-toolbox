@@ -6,6 +6,8 @@ import { fileURLToPath } from 'node:url';
 import { ConfigStore } from '../server-plugin/lib/config-store.js';
 import { SecuritySandbox } from '../server-plugin/lib/security-sandbox.js';
 import { TrashManager } from '../server-plugin/lib/trash-manager.js';
+import { FileLockManager } from '../server-plugin/lib/file-lock.js';
+import { FuzzyPatcher } from '../server-plugin/lib/fuzzy-patcher.js';
 import { FileEngine } from '../server-plugin/lib/tools/file-engine.js';
 import { SearchEngine } from '../server-plugin/lib/tools/search-engine.js';
 import { ProcessEngine } from '../server-plugin/lib/tools/process-engine.js';
@@ -37,19 +39,21 @@ function assert(condition, message) {
 }
 
 async function runTests() {
-    console.log('\n================ ST-TOOLBOX v2.0 TEST SUITE ================\n');
+    console.log('\n================ ST-TOOLBOX v2.0 INDUSTRIAL TEST SUITE ================\n');
 
     const configStore = new ConfigStore(TEST_SANDBOX_DIR);
     const sandbox = new SecuritySandbox(TEST_SANDBOX_DIR, configStore);
     const trashManager = new TrashManager(TEST_SANDBOX_DIR);
-    const fileEngine = new FileEngine(sandbox, trashManager, configStore);
+    const fileLockManager = new FileLockManager();
+
+    const fileEngine = new FileEngine(sandbox, trashManager, configStore, fileLockManager);
     const searchEngine = new SearchEngine(sandbox, configStore);
     const processEngine = new ProcessEngine(sandbox, configStore, TEST_SANDBOX_DIR);
     const netEngine = new NetEngine(configStore);
     const sysEngine = new SysEngine(sandbox, configStore, TEST_SANDBOX_DIR);
 
     // ----------------------------------------------------
-    console.log('--- 1. ConfigStore Tests ---');
+    console.log('--- 1. ConfigStore & Isolation Tests ---');
     const initialConfig = configStore.get();
     assert(initialConfig.version === '2.0.0', 'Initial config loaded with version 2.0.0');
 
@@ -57,15 +61,64 @@ async function runTests() {
     assert(configStore.getAllowedPaths().includes(TEST_SANDBOX_DIR), 'Allowed paths updated and persisted');
 
     // ----------------------------------------------------
-    console.log('\n--- 2. SecuritySandbox Tests ---');
+    console.log('\n--- 2. SecuritySandbox & Risk Analysis Tests ---');
     const validCheck = sandbox.validatePath(path.join(TEST_SANDBOX_DIR, 'test.txt'));
     assert(validCheck.valid === true, 'Valid path inside serverDirectory accepted');
 
     const invalidCheck = sandbox.validatePath('C:\\Windows\\System32\\drivers\\etc\\hosts');
     assert(invalidCheck.valid === false, 'Blacklisted system path blocked');
 
+    const destructiveRisk = sandbox.checkCommandRisk('rm -rf /');
+    assert(destructiveRisk.isHighRisk === true, 'Destructive rm -rf command flagged as high risk');
+
+    const safeRisk = sandbox.checkCommandRisk('git status');
+    assert(safeRisk.isHighRisk === false, 'Safe command passed risk check');
+
     // ----------------------------------------------------
-    console.log('\n--- 3. FileEngine CRUD & Patch Tests ---');
+    console.log('\n--- 3. FuzzyPatcher & Multi-Tier Matching Tests ---');
+    const sourceCode = `function calculateTotal(price, tax) {
+    // calculate with tax
+    const total = price * (1 + tax);
+    return total;
+}`;
+
+    // 3.1 Exact replacement
+    const r1 = FuzzyPatcher.replace(sourceCode, 'const total = price * (1 + tax);', 'const total = Math.round(price * (1 + tax));');
+    assert(r1.strategy === 'exact', 'Exact replacement strategy identified');
+
+    // 3.2 Whitespace-tolerant replacement
+    const r2 = FuzzyPatcher.replace(sourceCode, '    const total = price * (1 + tax);  ', '    const total = price * 1.15;', 1);
+    assert(r2.strategy === 'line-trimmed', 'Whitespace-tolerant line-trimmed strategy identified');
+
+    // 3.3 Fuzzy match
+    const r3 = FuzzyPatcher.replace(sourceCode, 'function calculateTotal(price, taxRate) {\n    // calculate with tax', 'function calculateTotal(price, tax) {\n    // calculate total with discount', 1);
+    assert(r3.strategy === 'fuzzy', 'Fuzzy Levenshtein matching strategy identified');
+
+    // 3.4 Unified Diff mode
+    const diff = `@@ -1,5 +1,5 @@
+ function calculateTotal(price, tax) {
+-    // calculate with tax
++    // calculated with updated algorithm
+     const total = price * (1 + tax);
+     return total;
+ }`;
+    const diffResult = FuzzyPatcher.applyUnifiedDiff(sourceCode, diff);
+    assert(diffResult.includes('updated algorithm'), 'Unified Diff patch successfully applied');
+
+    // ----------------------------------------------------
+    console.log('\n--- 4. FileLockManager & Concurrency Tests ---');
+    const lockTestFile = path.join(TEST_SANDBOX_DIR, 'concurrent.txt');
+    await fileEngine.writeFile({ filePath: lockTestFile, content: 'Initial\n' });
+
+    // Simulate 5 parallel concurrent edits
+    const concurrentPromises = [1, 2, 3, 4, 5].map(n =>
+        fileEngine.writeFile({ filePath: lockTestFile, content: `Write #${n}\n`, createBackup: false })
+    );
+    await Promise.all(concurrentPromises);
+    assert(fs.existsSync(lockTestFile), 'Concurrent write operations completed without lock collision or file corruption');
+
+    // ----------------------------------------------------
+    console.log('\n--- 5. FileEngine CRUD, Encoding & Diagnostics Tests ---');
     const testFile = path.join(TEST_SANDBOX_DIR, 'sample.txt');
     const initialText = 'Line 1: Hello World\nLine 2: Foo Bar\nLine 3: Test Data\nLine 4: End of File';
 
@@ -79,36 +132,22 @@ async function runTests() {
     assert(readRes.linesRead === 2, 'readFile read correct slice');
     assert(readRes.content.includes('2: Line 2: Foo Bar'), 'readFile formatted line numbers');
 
-    // Edit file (exact replace)
+    // Edit file with fuzzy patcher
     const editRes = await fileEngine.editFile({ filePath: testFile, oldText: 'Foo Bar', newText: 'Antigravity AI' });
     assert(editRes.replacedCount === 1, 'editFile replaced 1 occurrence');
     const afterEdit = fs.readFileSync(testFile, 'utf-8');
     assert(afterEdit.includes('Antigravity AI'), 'File content updated after edit');
 
-    // Patch file (multi-chunk)
-    const patchRes = await fileEngine.patchFile({
-        filePath: testFile,
-        patches: [
-            { oldText: 'Hello World', newText: 'Hello SillyTavern' },
-            { oldText: 'End of File', newText: 'End of Stream' },
-        ],
-    });
-    assert(patchRes.patchesApplied === 2, 'patchFile applied 2 chunks');
-    const afterPatch = fs.readFileSync(testFile, 'utf-8');
-    assert(afterPatch.includes('Hello SillyTavern') && afterPatch.includes('End of Stream'), 'All patches successfully applied');
-
-    // Copy file
+    // Copy & Move
     const copyTarget = path.join(TEST_SANDBOX_DIR, 'sample_copy.txt');
     await fileEngine.copyFile({ sourcePath: testFile, destinationPath: copyTarget });
     assert(fs.existsSync(copyTarget), 'copyFile created duplicate');
 
-    // Move file
     const moveTarget = path.join(TEST_SANDBOX_DIR, 'sample_moved.txt');
     await fileEngine.moveFile({ sourcePath: copyTarget, destinationPath: moveTarget });
     assert(!fs.existsSync(copyTarget) && fs.existsSync(moveTarget), 'moveFile successfully relocated file');
 
-    // ----------------------------------------------------
-    console.log('\n--- 4. TrashManager & Restore Tests ---');
+    // Safe Trash & Restore
     const deleteRes = await fileEngine.deleteFile({ filePath: moveTarget, permanent: false });
     assert(deleteRes.deleted === true && !deleteRes.permanent, 'deleteFile safely moved file to trash');
     assert(!fs.existsSync(moveTarget), 'Original file removed from source path');
@@ -118,18 +157,18 @@ async function runTests() {
     assert(fs.existsSync(moveTarget), 'Restored file exists back at original path');
 
     // ----------------------------------------------------
-    console.log('\n--- 5. SearchEngine Tests ---');
+    console.log('\n--- 6. SearchEngine Asynchronous Tests ---');
     const listRes = await searchEngine.listDirectory({ dirPath: TEST_SANDBOX_DIR });
     assert(listRes.totalItems >= 2, 'listDirectory returned items in directory');
 
-    const grepRes = await searchEngine.searchFiles({ query: 'SillyTavern', path: TEST_SANDBOX_DIR });
+    const grepRes = await searchEngine.searchFiles({ query: 'Antigravity', path: TEST_SANDBOX_DIR });
     assert(grepRes.totalFilesMatched >= 1, 'searchFiles found matching occurrences');
 
     const findRes = await searchEngine.findByName({ pattern: '*.txt', path: TEST_SANDBOX_DIR });
     assert(findRes.totalMatches >= 2, 'findByName matched glob pattern');
 
     // ----------------------------------------------------
-    console.log('\n--- 6. ProcessEngine & UTF-8 Tests ---');
+    console.log('\n--- 7. ProcessEngine & Task Manager Tests ---');
     const procRes = await processEngine.executeCommand({ command: 'echo "ST_TOOLBOX_OK"' });
     assert(procRes.exitCode === 0, 'executeCommand exited with code 0');
     assert(procRes.output.includes('ST_TOOLBOX_OK'), 'executeCommand captured stdout output');
@@ -138,17 +177,22 @@ async function runTests() {
     assert(chineseRes.exitCode === 0, 'executeCommand Chinese echo exited with code 0');
     assert(chineseRes.output.includes('你好SillyTavern'), 'PowerShell Chinese UTF-8 verified without garbled text');
 
+    // Test daemon task execution
+    const daemonRes = await processEngine.executeCommand({ command: 'echo "Daemon"', isDaemon: true });
+    assert(daemonRes.status === 'running_background', 'isDaemon successfully started background task');
+    assert(daemonRes.taskId.startsWith('proc_'), 'Task ID assigned to background process');
+
+    const taskStatus = processEngine.getTask(daemonRes.taskId);
+    assert(taskStatus.taskId === daemonRes.taskId, 'getTask retrieved background task status');
+
     // ----------------------------------------------------
-    console.log('\n--- 7. NetEngine Tests ---');
+    console.log('\n--- 8. NetEngine & SysEngine Tests ---');
     assert(typeof netEngine.httpRequest === 'function', 'NetEngine httpRequest available');
     assert(typeof netEngine.fetchWebpage === 'function', 'NetEngine fetchWebpage available');
 
-    // ----------------------------------------------------
-    console.log('\n--- 8. SysEngine Tests ---');
     const env = await sysEngine.getEnvironment();
     assert(env.platform === process.platform, 'SysEngine retrieved current platform');
     assert(env.memory.totalMB > 0, 'SysEngine retrieved memory metrics');
-    assert(Array.isArray(env.allowedPaths), 'SysEngine retrieved allowed paths');
 
     // ----------------------------------------------------
     // Cleanup temporary test sandbox

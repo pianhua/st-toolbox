@@ -54,7 +54,6 @@ export class SecuritySandbox {
     isBlacklisted(normalizedPath) {
         const lower = normalizedPath.toLowerCase();
 
-        // High-risk OS files and credentials
         const dangerousPatterns = [
             /\\windows\\system32/i,
             /\\windows\\syswow64/i,
@@ -62,6 +61,7 @@ export class SecuritySandbox {
             /\/etc\/sudoers/i,
             /\/etc\/passwd/i,
             /\.ssh[\\\/](id_rsa|id_ed25519|id_ecdsa|id_dsa)$/i,
+            /\.git[\\\/]config$/i,
         ];
 
         for (const pattern of dangerousPatterns) {
@@ -81,7 +81,7 @@ export class SecuritySandbox {
      */
     validatePath(inputPath, options = {}) {
         if (!inputPath || typeof inputPath !== 'string') {
-            return { valid: false, error: 'Path parameter is required' };
+            return { valid: false, error: 'Path parameter is required and must be a string' };
         }
 
         const expanded = this.expandPath(inputPath);
@@ -91,12 +91,12 @@ export class SecuritySandbox {
 
         resolved = path.normalize(resolved);
 
-        // Check if file exists and resolve real symlink if present
+        // Check if file exists and resolve real symlink if present to prevent symlink traversal
         if (fs.existsSync(resolved)) {
             try {
                 resolved = path.normalize(fs.realpathSync(resolved));
             } catch (e) {
-                // Ignore realpath errors and proceed with normalized
+                // Keep normalized path if realpath fails
             }
         }
 
@@ -104,7 +104,7 @@ export class SecuritySandbox {
         if (this.isBlacklisted(resolved)) {
             return {
                 valid: false,
-                error: `Access Denied: Path '${inputPath}' is protected by system security rules.`,
+                error: `Security Alert: Path '${inputPath}' is a sensitive system resource and access is blocked.`,
             };
         }
 
@@ -114,7 +114,6 @@ export class SecuritySandbox {
 
         for (const allowedPath of allowedPaths) {
             const normAllowed = path.normalize(allowedPath);
-            // Case-insensitive check on Windows
             if (this.isWindows) {
                 if (
                     resolved.toLowerCase() === normAllowed.toLowerCase() ||
@@ -137,10 +136,38 @@ export class SecuritySandbox {
         if (!allowed) {
             return {
                 valid: false,
-                error: `Access Denied: Path '${inputPath}' is not within allowed whitelist directories. Add it in ST-Toolbox settings if needed.`,
+                error: `Access Denied: Path '${inputPath}' is not within any allowed whitelist directory.\nActive Whitelist:\n${allowedPaths.map(p => `  - ${p}`).join('\n')}\nAdd this directory in ST-Toolbox settings if you want to allow access.`,
             };
         }
 
         return { valid: true, resolvedPath: resolved };
+    }
+
+    /**
+     * Check if a shell command contains catastrophic destructive actions
+     */
+    checkCommandRisk(command) {
+        if (!command || typeof command !== 'string') return { isHighRisk: false };
+
+        const highRiskPatterns = [
+            /\brm\s+-rf\s+[\/\\]/i,
+            /\bmkfs\b/i,
+            /\bformat\s+[a-z]:/i,
+            /\bdiskpart\b/i,
+            /\bdel\s+\/[sfq]\s+c:\\/i,
+            /\bshutdown\b/i,
+            /\bdrop\s+database\b/i,
+        ];
+
+        for (const pattern of highRiskPatterns) {
+            if (pattern.test(command)) {
+                return {
+                    isHighRisk: true,
+                    reason: `Command matches critical destructive pattern: ${pattern.toString()}`,
+                };
+            }
+        }
+
+        return { isHighRisk: false };
     }
 }

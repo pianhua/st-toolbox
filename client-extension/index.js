@@ -1,6 +1,7 @@
 import { getContext, renderExtensionTemplateAsync } from '../../../extensions.js';
 import { createToolDefinitions } from './src/tool-definitions.js';
 import { SettingsController } from './src/settings-controller.js';
+import { registerSlashCommands } from './src/slash-commands.js';
 
 const EXTENSION_NAME = 'third-party/st-toolbox';
 const API_PREFIX = '/api/plugins/st-toolbox';
@@ -38,7 +39,7 @@ function syncRegisteredTools(config) {
  * Main initialization entry point
  */
 export async function init() {
-    console.log(`[${EXTENSION_NAME}] Initializing ST-Toolbox v2.0...`);
+    console.log(`[${EXTENSION_NAME}] Initializing ST-Toolbox v2.0 (Industrial Edition)...`);
 
     context = getContext();
     ToolManager = context.ToolManager;
@@ -56,14 +57,18 @@ export async function init() {
         (updatedConfig) => syncRegisteredTools(updatedConfig),
     );
 
-    // Create 14 function tools with logging callback
+    // Create tool definitions with logging callback
     allTools = createToolDefinitions(
         API_PREFIX,
         context.getRequestHeaders,
         (endpoint, payload, result, duration, isSuccess) => {
             settingsController.addLog(endpoint, payload, result, duration, isSuccess);
         },
+        () => settingsController.config,
     );
+
+    // Register slash commands
+    registerSlashCommands(context, API_PREFIX);
 
     // Load HTML settings template
     try {

@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-const DEFAULT_IGNORES = new Set([
+const ALWAYS_IGNORES = new Set([
     'node_modules',
     '.git',
     '.trash',
@@ -15,30 +15,25 @@ const DEFAULT_IGNORES = new Set([
     '.idea',
 ]);
 
-const BINARY_EXTENSIONS = new Set([
-    '.png', '.jpg', '.jpeg', '.gif', '.ico', '.webp', '.bmp', '.tiff', '.mp3', '.mp4',
-    '.wav', '.avi', '.mov', '.mkv', '.flac', '.zip', '.tar', '.gz', '.7z', '.rar',
-    '.exe', '.dll', '.so', '.dylib', '.bin', '.pdf', '.docx', '.xlsx', '.pptx',
-    '.wasm', '.pyc', '.class', '.o', '.obj',
-]);
-
 export class SearchEngine {
     constructor(sandbox, configStore) {
         this.sandbox = sandbox;
         this.configStore = configStore;
     }
 
-    isIgnored(name) {
-        return DEFAULT_IGNORES.has(name) || name.startsWith('~$');
-    }
-
-    isBinaryFile(filePath) {
-        const ext = path.extname(filePath).toLowerCase();
-        return BINARY_EXTENSIONS.has(ext);
+    /**
+     * Check if buffer contains null bytes (binary file check)
+     */
+    isBinaryBuffer(buffer) {
+        const checkLen = Math.min(buffer.length, 512);
+        for (let i = 0; i < checkLen; i++) {
+            if (buffer[i] === 0) return true;
+        }
+        return false;
     }
 
     /**
-     * List contents of a directory with depth control
+     * Asynchronous recursive directory listing
      */
     async listDirectory({ dirPath = '.', depth = 1, recursive = false, includeHidden = false }) {
         const check = this.sandbox.validatePath(dirPath);
@@ -49,7 +44,7 @@ export class SearchEngine {
             throw new Error(`Directory not found: ${dirPath}`);
         }
 
-        const rootStats = fs.statSync(rootPath);
+        const rootStats = await fs.promises.stat(rootPath);
         if (!rootStats.isDirectory()) {
             throw new Error(`Path is not a directory: ${dirPath}`);
         }
@@ -57,12 +52,12 @@ export class SearchEngine {
         const maxDepth = recursive ? (parseInt(depth) || 5) : 1;
         const items = [];
 
-        const scan = (currentDir, currentDepth) => {
+        const scan = async (currentDir, currentDepth) => {
             if (currentDepth > maxDepth) return;
 
             let entries;
             try {
-                entries = fs.readdirSync(currentDir, { withFileTypes: true });
+                entries = await fs.promises.readdir(currentDir, { withFileTypes: true });
             } catch (e) {
                 return;
             }
@@ -71,7 +66,7 @@ export class SearchEngine {
                 if (!includeHidden && entry.name.startsWith('.') && entry.name !== '.') {
                     continue;
                 }
-                if (this.isIgnored(entry.name)) {
+                if (ALWAYS_IGNORES.has(entry.name)) {
                     continue;
                 }
 
@@ -79,7 +74,7 @@ export class SearchEngine {
                 const relPath = path.relative(rootPath, fullPath) || entry.name;
 
                 try {
-                    const stats = fs.statSync(fullPath);
+                    const stats = await fs.promises.stat(fullPath);
                     const isDir = entry.isDirectory();
 
                     items.push({
@@ -92,15 +87,15 @@ export class SearchEngine {
                     });
 
                     if (isDir && currentDepth < maxDepth) {
-                        scan(fullPath, currentDepth + 1);
+                        await scan(fullPath, currentDepth + 1);
                     }
                 } catch (e) {
-                    // Skip inaccessible entries
+                    // Ignore inaccessible items
                 }
             }
         };
 
-        scan(rootPath, 1);
+        await scan(rootPath, 1);
 
         return {
             dirPath: rootPath,
@@ -110,11 +105,11 @@ export class SearchEngine {
     }
 
     /**
-     * Search file contents using regex or string match
+     * Asynchronous multi-file content search (ripgrep-style)
      */
     async searchFiles({ query, path: searchDir = '.', pattern = '*', caseSensitive = false, isRegex = false, maxResults = 50 }) {
         if (!query || typeof query !== 'string') {
-            throw new Error('Search query is required');
+            throw new Error('Search query parameter is required');
         }
 
         const check = this.sandbox.validatePath(searchDir);
@@ -141,30 +136,32 @@ export class SearchEngine {
         let totalMatches = 0;
         const maxHits = parseInt(maxResults) || 50;
 
-        const searchInDir = (currentDir) => {
+        const searchInDir = async (currentDir) => {
             if (results.length >= maxHits) return;
 
             let entries;
             try {
-                entries = fs.readdirSync(currentDir, { withFileTypes: true });
+                entries = await fs.promises.readdir(currentDir, { withFileTypes: true });
             } catch (e) {
                 return;
             }
 
             for (const entry of entries) {
                 if (results.length >= maxHits) break;
-                if (this.isIgnored(entry.name)) continue;
+                if (ALWAYS_IGNORES.has(entry.name)) continue;
 
                 const fullPath = path.join(currentDir, entry.name);
 
                 if (entry.isDirectory()) {
-                    searchInDir(fullPath);
+                    await searchInDir(fullPath);
                 } else if (entry.isFile()) {
-                    if (this.isBinaryFile(fullPath)) continue;
                     if (globPattern && !globPattern.test(entry.name)) continue;
 
                     try {
-                        const content = fs.readFileSync(fullPath, 'utf-8');
+                        const buffer = await fs.promises.readFile(fullPath);
+                        if (this.isBinaryBuffer(buffer)) continue;
+
+                        const content = buffer.toString('utf-8');
                         const lines = content.split(/\r?\n/);
                         const fileMatches = [];
 
@@ -191,13 +188,13 @@ export class SearchEngine {
                             });
                         }
                     } catch (e) {
-                        // Skip binary or unreadable files
+                        // Skip unreadable files
                     }
                 }
             }
         };
 
-        searchInDir(rootPath);
+        await searchInDir(rootPath);
 
         return {
             query,
@@ -209,7 +206,7 @@ export class SearchEngine {
     }
 
     /**
-     * Find files or directories matching glob pattern
+     * Fast Glob Search
      */
     async findByName({ pattern = '*', path: searchDir = '.', type = 'any', maxDepth = 10, maxResults = 50 }) {
         const check = this.sandbox.validatePath(searchDir);
@@ -229,19 +226,19 @@ export class SearchEngine {
         const limit = parseInt(maxResults) || 50;
         const depthLimit = parseInt(maxDepth) || 10;
 
-        const scan = (currentDir, currentDepth) => {
+        const scan = async (currentDir, currentDepth) => {
             if (currentDepth > depthLimit || matches.length >= limit) return;
 
             let entries;
             try {
-                entries = fs.readdirSync(currentDir, { withFileTypes: true });
+                entries = await fs.promises.readdir(currentDir, { withFileTypes: true });
             } catch (e) {
                 return;
             }
 
             for (const entry of entries) {
                 if (matches.length >= limit) break;
-                if (this.isIgnored(entry.name)) continue;
+                if (ALWAYS_IGNORES.has(entry.name)) continue;
 
                 const fullPath = path.join(currentDir, entry.name);
                 const isDir = entry.isDirectory();
@@ -261,12 +258,12 @@ export class SearchEngine {
                 }
 
                 if (isDir && currentDepth < depthLimit) {
-                    scan(fullPath, currentDepth + 1);
+                    await scan(fullPath, currentDepth + 1);
                 }
             }
         };
 
-        scan(rootPath, 1);
+        await scan(rootPath, 1);
 
         return {
             pattern,
