@@ -1,17 +1,23 @@
 # Dependencies
 node_modules/
 
-# IDE
+# Runtime Data & Sandboxes
+data/
+.trash/
+tests/sandbox_temp/
+*.bak*
+
+# IDE & Editors
 .vscode/
 .idea/
+*.swp
+*.swo
 
-# OS
+# OS Artifacts
 .DS_Store
 Thumbs.db
 
-# Logs
+# Logs & Temp
 *.log
-
-# Temporary files
 *.tmp
 *.temp

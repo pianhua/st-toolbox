@@ -4,16 +4,25 @@
   "description": "Minimalist AI tool calling suite for SillyTavern (Read, Write, Edit, Bash)",
   "main": "server.js",
   "type": "module",
+  "scripts": {
+    "test": "node tests/test-suite.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pianhua/st-toolbox.git"
+  },
   "keywords": [
     "sillytavern",
-    "tools",
+    "sillytavern-extension",
     "tool-calling",
-    "pi-agent",
-    "read",
-    "write",
-    "edit",
-    "bash"
+    "agent",
+    "pi-mono",
+    "developer-tools"
   ],
   "author": "ST Toolbox Contributors",
-  "license": "MIT"
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/pianhua/st-toolbox/issues"
+  },
+  "homepage": "https://github.com/pianhua/st-toolbox#readme"
 }
