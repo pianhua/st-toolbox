@@ -11,14 +11,12 @@ export class SettingsController {
     async init() {
         this.bindEvents();
         await this.loadConfig();
-        await this.loadTrash();
     }
 
     bindEvents() {
         $('#st-toolbox-save').off('click').on('click', () => this.saveConfig());
         $('#st-toolbox-reload').off('click').on('click', () => this.loadConfig());
         $('#st-toolbox-test-path-btn').off('click').on('click', () => this.testPath());
-        $('#st-toolbox-refresh-trash').off('click').on('click', () => this.loadTrash());
         $('#st-toolbox-clear-logs').off('click').on('click', () => this.clearLogs());
 
         // Quick add buttons
@@ -32,15 +30,6 @@ export class SettingsController {
                     $('#st-toolbox-allowed-paths').val(lines.join('\n'));
                 }
             }
-        });
-
-        // Tab switching
-        $('.st-toolbox-tab-btn').off('click').on('click', (e) => {
-            const tabId = $(e.currentTarget).data('tab');
-            $('.st-toolbox-tab-btn').removeClass('active');
-            $(e.currentTarget).addClass('active');
-            $('.st-toolbox-tab-content').hide();
-            $(`#st-toolbox-tab-${tabId}`).show();
         });
     }
 
@@ -72,7 +61,7 @@ export class SettingsController {
                 $(this).prop('checked', isEnabled);
             });
 
-            this.showStatus('配置已加载成功', 'success');
+            this.showStatus('配置已成功加载', 'success');
             if (this.onConfigUpdated) this.onConfigUpdated(this.config);
         } catch (err) {
             console.error('[ST-Toolbox] Failed to load config:', err);
@@ -116,7 +105,7 @@ export class SettingsController {
             const data = await res.json();
             this.config = data.config;
 
-            this.showStatus(`配置保存成功！白名单包含 ${allowedPaths.length} 个路径。`, 'success');
+            this.showStatus(`配置保存成功！白名单包含 ${allowedPaths.length} 个目录。`, 'success');
             if (this.onConfigUpdated) this.onConfigUpdated(this.config);
         } catch (err) {
             console.error('[ST-Toolbox] Failed to save config:', err);
@@ -154,72 +143,6 @@ export class SettingsController {
         }
     }
 
-    async loadTrash() {
-        try {
-            const res = await fetch(`${this.apiPrefix}/trash`, {
-                headers: this.getHeaders ? this.getHeaders() : {},
-            });
-            if (!res.ok) return;
-
-            const list = await res.json();
-            const container = $('#st-toolbox-trash-list');
-            container.empty();
-
-            if (!Array.isArray(list) || list.length === 0) {
-                container.html('<div style="opacity:0.6; padding:10px;">回收站暂无文件</div>');
-                return;
-            }
-
-            list.forEach(item => {
-                const dateStr = new Date(item.trashedAt).toLocaleString();
-                const row = $(`
-                    <div class="st-toolbox-trash-item">
-                        <div class="trash-info">
-                            <b>${item.fileName}</b>
-                            <small>${item.originalPath} (${dateStr})</small>
-                        </div>
-                        <button class="menu_button restore-btn" data-id="${item.trashId}">
-                            <i class="fa-solid fa-rotate-left"></i> 恢复
-                        </button>
-                    </div>
-                `);
-
-                row.find('.restore-btn').on('click', async (e) => {
-                    const id = $(e.currentTarget).data('id');
-                    await this.restoreTrash(id);
-                });
-
-                container.append(row);
-            });
-        } catch (e) {
-            console.error('[ST-Toolbox] Error loading trash:', e);
-        }
-    }
-
-    async restoreTrash(identifier) {
-        try {
-            const res = await fetch(`${this.apiPrefix}/trash/restore`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(this.getHeaders ? this.getHeaders() : {}),
-                },
-                body: JSON.stringify({ identifier }),
-            });
-
-            if (!res.ok) {
-                const err = await res.json();
-                throw new Error(err.error || res.statusText);
-            }
-
-            const data = await res.json();
-            this.showStatus(`已恢复: ${data.restoredPath}`, 'success');
-            await this.loadTrash();
-        } catch (e) {
-            this.showStatus(`恢复失败: ${e.message}`, 'error');
-        }
-    }
-
     addLog(endpoint, payload, result, duration, isSuccess) {
         const entry = {
             id: Date.now(),
@@ -232,7 +155,7 @@ export class SettingsController {
         };
 
         this.logs.unshift(entry);
-        if (this.logs.length > 50) this.logs.pop();
+        if (this.logs.length > 30) this.logs.pop();
 
         this.renderLogs();
     }
@@ -256,7 +179,7 @@ export class SettingsController {
                         <small>${log.time}</small>
                     </div>
                     <details class="log-details">
-                        <summary>查看参数与返回值</summary>
+                        <summary>查看详情</summary>
                         <pre><code>参数: ${JSON.stringify(log.payload, null, 2)}\n\n结果: ${typeof log.result === 'object' ? JSON.stringify(log.result, null, 2) : log.result}</code></pre>
                     </details>
                 </div>

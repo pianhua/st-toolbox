@@ -1,0 +1,19 @@
+{
+  "name": "st-toolbox",
+  "version": "2.0.0",
+  "description": "Minimalist AI tool calling suite for SillyTavern (Read, Write, Edit, Bash)",
+  "main": "server.js",
+  "type": "module",
+  "keywords": [
+    "sillytavern",
+    "tools",
+    "tool-calling",
+    "pi-agent",
+    "read",
+    "write",
+    "edit",
+    "bash"
+  ],
+  "author": "ST Toolbox Contributors",
+  "license": "MIT"
+}

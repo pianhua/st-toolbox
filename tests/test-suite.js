@@ -3,16 +3,14 @@ import fs from 'node:fs';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 
-import { ConfigStore } from '../server-plugin/lib/config-store.js';
-import { SecuritySandbox } from '../server-plugin/lib/security-sandbox.js';
-import { TrashManager } from '../server-plugin/lib/trash-manager.js';
-import { FileLockManager } from '../server-plugin/lib/file-lock.js';
-import { FuzzyPatcher } from '../server-plugin/lib/fuzzy-patcher.js';
-import { FileEngine } from '../server-plugin/lib/tools/file-engine.js';
-import { SearchEngine } from '../server-plugin/lib/tools/search-engine.js';
-import { ProcessEngine } from '../server-plugin/lib/tools/process-engine.js';
-import { NetEngine } from '../server-plugin/lib/tools/net-engine.js';
-import { SysEngine } from '../server-plugin/lib/tools/sys-engine.js';
+import { ConfigStore } from '../lib/config-store.js';
+import { SecuritySandbox } from '../lib/security-sandbox.js';
+import { TrashManager } from '../lib/trash-manager.js';
+import { FileLockManager } from '../lib/file-lock.js';
+import { FuzzyPatcher } from '../lib/fuzzy-patcher.js';
+import { FileEngine } from '../lib/tools/file-engine.js';
+import { ProcessEngine } from '../lib/tools/process-engine.js';
+import { SysEngine } from '../lib/tools/sys-engine.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -39,7 +37,7 @@ function assert(condition, message) {
 }
 
 async function runTests() {
-    console.log('\n================ ST-TOOLBOX v2.0 INDUSTRIAL TEST SUITE ================\n');
+    console.log('\n================ ST-TOOLBOX (PI EDITION) TEST SUITE ================\n');
 
     const configStore = new ConfigStore(TEST_SANDBOX_DIR);
     const sandbox = new SecuritySandbox(TEST_SANDBOX_DIR, configStore);
@@ -47,15 +45,14 @@ async function runTests() {
     const fileLockManager = new FileLockManager();
 
     const fileEngine = new FileEngine(sandbox, trashManager, configStore, fileLockManager);
-    const searchEngine = new SearchEngine(sandbox, configStore);
     const processEngine = new ProcessEngine(sandbox, configStore, TEST_SANDBOX_DIR);
-    const netEngine = new NetEngine(configStore);
     const sysEngine = new SysEngine(sandbox, configStore, TEST_SANDBOX_DIR);
 
     // ----------------------------------------------------
     console.log('--- 1. ConfigStore & Isolation Tests ---');
     const initialConfig = configStore.get();
     assert(initialConfig.version === '2.0.0', 'Initial config loaded with version 2.0.0');
+    assert(Object.keys(initialConfig.enabledTools).length === 4, 'Streamlined to exactly 4 Pi core tools');
 
     configStore.save({ allowedPaths: [TEST_SANDBOX_DIR] });
     assert(configStore.getAllowedPaths().includes(TEST_SANDBOX_DIR), 'Allowed paths updated and persisted');
@@ -94,105 +91,45 @@ async function runTests() {
     const r3 = FuzzyPatcher.replace(sourceCode, 'function calculateTotal(price, taxRate) {\n    // calculate with tax', 'function calculateTotal(price, tax) {\n    // calculate total with discount', 1);
     assert(r3.strategy === 'fuzzy', 'Fuzzy Levenshtein matching strategy identified');
 
-    // 3.4 Unified Diff mode
-    const diff = `@@ -1,5 +1,5 @@
- function calculateTotal(price, tax) {
--    // calculate with tax
-+    // calculated with updated algorithm
-     const total = price * (1 + tax);
-     return total;
- }`;
-    const diffResult = FuzzyPatcher.applyUnifiedDiff(sourceCode, diff);
-    assert(diffResult.includes('updated algorithm'), 'Unified Diff patch successfully applied');
-
     // ----------------------------------------------------
     console.log('\n--- 4. FileLockManager & Concurrency Tests ---');
     const lockTestFile = path.join(TEST_SANDBOX_DIR, 'concurrent.txt');
     await fileEngine.writeFile({ filePath: lockTestFile, content: 'Initial\n' });
 
-    // Simulate 5 parallel concurrent edits
     const concurrentPromises = [1, 2, 3, 4, 5].map(n =>
         fileEngine.writeFile({ filePath: lockTestFile, content: `Write #${n}\n`, createBackup: false })
     );
     await Promise.all(concurrentPromises);
-    assert(fs.existsSync(lockTestFile), 'Concurrent write operations completed without lock collision or file corruption');
+    assert(fs.existsSync(lockTestFile), 'Concurrent write operations completed without race conditions');
 
     // ----------------------------------------------------
-    console.log('\n--- 5. FileEngine CRUD, Encoding & Diagnostics Tests ---');
+    console.log('\n--- 5. The 4 Pi Tools CRUD Tests (Read, Write, Edit, Bash) ---');
     const testFile = path.join(TEST_SANDBOX_DIR, 'sample.txt');
     const initialText = 'Line 1: Hello World\nLine 2: Foo Bar\nLine 3: Test Data\nLine 4: End of File';
 
-    // Write file
+    // Tool 1: WRITE
     const writeRes = await fileEngine.writeFile({ filePath: testFile, content: initialText });
-    assert(writeRes.success === true, 'writeFile executed successfully');
-    assert(fs.existsSync(testFile), 'File physically created on disk');
+    assert(writeRes.success === true, 'write_file executed successfully');
 
-    // Read file with line numbers & offset
+    // Tool 2: READ
     const readRes = await fileEngine.readFile({ filePath: testFile, offset: 2, limit: 2, showLineNumbers: true });
-    assert(readRes.linesRead === 2, 'readFile read correct slice');
-    assert(readRes.content.includes('2: Line 2: Foo Bar'), 'readFile formatted line numbers');
+    assert(readRes.linesRead === 2, 'read_file read requested lines');
+    assert(readRes.content.includes('2: Line 2: Foo Bar'), 'read_file formatted line numbers');
 
-    // Edit file with fuzzy patcher
+    // Tool 3: EDIT
     const editRes = await fileEngine.editFile({ filePath: testFile, oldText: 'Foo Bar', newText: 'Antigravity AI' });
-    assert(editRes.replacedCount === 1, 'editFile replaced 1 occurrence');
+    assert(editRes.replacedCount === 1, 'edit_file replaced text accurately');
     const afterEdit = fs.readFileSync(testFile, 'utf-8');
-    assert(afterEdit.includes('Antigravity AI'), 'File content updated after edit');
+    assert(afterEdit.includes('Antigravity AI'), 'edit_file updated file content');
 
-    // Copy & Move
-    const copyTarget = path.join(TEST_SANDBOX_DIR, 'sample_copy.txt');
-    await fileEngine.copyFile({ sourcePath: testFile, destinationPath: copyTarget });
-    assert(fs.existsSync(copyTarget), 'copyFile created duplicate');
-
-    const moveTarget = path.join(TEST_SANDBOX_DIR, 'sample_moved.txt');
-    await fileEngine.moveFile({ sourcePath: copyTarget, destinationPath: moveTarget });
-    assert(!fs.existsSync(copyTarget) && fs.existsSync(moveTarget), 'moveFile successfully relocated file');
-
-    // Safe Trash & Restore
-    const deleteRes = await fileEngine.deleteFile({ filePath: moveTarget, permanent: false });
-    assert(deleteRes.deleted === true && !deleteRes.permanent, 'deleteFile safely moved file to trash');
-    assert(!fs.existsSync(moveTarget), 'Original file removed from source path');
-
-    const restoreRes = await fileEngine.restoreFile({ identifier: deleteRes.trashId });
-    assert(restoreRes.success === true, 'restoreFile successfully restored file');
-    assert(fs.existsSync(moveTarget), 'Restored file exists back at original path');
-
-    // ----------------------------------------------------
-    console.log('\n--- 6. SearchEngine Asynchronous Tests ---');
-    const listRes = await searchEngine.listDirectory({ dirPath: TEST_SANDBOX_DIR });
-    assert(listRes.totalItems >= 2, 'listDirectory returned items in directory');
-
-    const grepRes = await searchEngine.searchFiles({ query: 'Antigravity', path: TEST_SANDBOX_DIR });
-    assert(grepRes.totalFilesMatched >= 1, 'searchFiles found matching occurrences');
-
-    const findRes = await searchEngine.findByName({ pattern: '*.txt', path: TEST_SANDBOX_DIR });
-    assert(findRes.totalMatches >= 2, 'findByName matched glob pattern');
-
-    // ----------------------------------------------------
-    console.log('\n--- 7. ProcessEngine & Task Manager Tests ---');
+    // Tool 4: BASH (with UTF-8 Chinese)
     const procRes = await processEngine.executeCommand({ command: 'echo "ST_TOOLBOX_OK"' });
-    assert(procRes.exitCode === 0, 'executeCommand exited with code 0');
-    assert(procRes.output.includes('ST_TOOLBOX_OK'), 'executeCommand captured stdout output');
+    assert(procRes.exitCode === 0, 'execute_bash exited with code 0');
+    assert(procRes.output.includes('ST_TOOLBOX_OK'), 'execute_bash captured output');
 
-    const chineseRes = await processEngine.executeCommand({ command: 'Write-Output "测试中文无乱码，你好SillyTavern"' });
-    assert(chineseRes.exitCode === 0, 'executeCommand Chinese echo exited with code 0');
-    assert(chineseRes.output.includes('你好SillyTavern'), 'PowerShell Chinese UTF-8 verified without garbled text');
-
-    // Test daemon task execution
-    const daemonRes = await processEngine.executeCommand({ command: 'echo "Daemon"', isDaemon: true });
-    assert(daemonRes.status === 'running_background', 'isDaemon successfully started background task');
-    assert(daemonRes.taskId.startsWith('proc_'), 'Task ID assigned to background process');
-
-    const taskStatus = processEngine.getTask(daemonRes.taskId);
-    assert(taskStatus.taskId === daemonRes.taskId, 'getTask retrieved background task status');
-
-    // ----------------------------------------------------
-    console.log('\n--- 8. NetEngine & SysEngine Tests ---');
-    assert(typeof netEngine.httpRequest === 'function', 'NetEngine httpRequest available');
-    assert(typeof netEngine.fetchWebpage === 'function', 'NetEngine fetchWebpage available');
-
-    const env = await sysEngine.getEnvironment();
-    assert(env.platform === process.platform, 'SysEngine retrieved current platform');
-    assert(env.memory.totalMB > 0, 'SysEngine retrieved memory metrics');
+    const chineseRes = await processEngine.executeCommand({ command: 'Write-Output "测试中文输出正常，你好SillyTavern"' });
+    assert(chineseRes.exitCode === 0, 'PowerShell Chinese command succeeded');
+    assert(chineseRes.output.includes('你好SillyTavern'), 'PowerShell Chinese UTF-8 verified without garbling');
 
     // ----------------------------------------------------
     // Cleanup temporary test sandbox

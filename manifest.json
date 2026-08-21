@@ -6,7 +6,7 @@
   "js": "index.js",
   "author": "ST Toolbox Contributors",
   "version": "2.0.0",
-  "description": "High-performance AI Tool Calling suite with sandboxed filesystem, diff patching, fast search, shell execution, webpage scraping, and system diagnostics.",
+  "description": "Minimalist, high-performance AI coding tools (Read, Write, Edit, Bash) inspired by Pi Agent.",
   "homePage": "https://github.com/pianhua/st-toolbox",
   "minimum_client_version": "1.12.0",
   "auto_update": true,

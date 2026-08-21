@@ -39,7 +39,7 @@ function syncRegisteredTools(config) {
  * Main initialization entry point
  */
 export async function init() {
-    console.log(`[${EXTENSION_NAME}] Initializing ST-Toolbox v2.0 (Industrial Edition)...`);
+    console.log(`[${EXTENSION_NAME}] Initializing ST-Toolbox (Pi Edition)...`);
 
     context = getContext();
     ToolManager = context.ToolManager;
@@ -57,20 +57,19 @@ export async function init() {
         (updatedConfig) => syncRegisteredTools(updatedConfig),
     );
 
-    // Create tool definitions with logging callback
+    // Create 4 Pi core tool definitions
     allTools = createToolDefinitions(
         API_PREFIX,
         context.getRequestHeaders,
         (endpoint, payload, result, duration, isSuccess) => {
             settingsController.addLog(endpoint, payload, result, duration, isSuccess);
         },
-        () => settingsController.config,
     );
 
-    // Register slash commands
+    // Register slash commands (/toolbox-status, /toolbox-test)
     registerSlashCommands(context, API_PREFIX);
 
-    // Load HTML settings template
+    // Load HTML settings template from extension root
     try {
         const templateHtml = await renderExtensionTemplateAsync(EXTENSION_NAME, 'settings');
         const container = $('#extensions_settings').length ? $('#extensions_settings') : $('#extensions_settings2');
@@ -78,7 +77,7 @@ export async function init() {
         if (container.length > 0) {
             container.append(templateHtml);
             await settingsController.init();
-            console.log(`[${EXTENSION_NAME}] Settings UI initialized.`);
+            console.log(`[${EXTENSION_NAME}] Settings UI loaded.`);
         } else {
             console.warn(`[${EXTENSION_NAME}] Extensions settings container not found in DOM.`);
         }
@@ -86,5 +85,5 @@ export async function init() {
         console.error(`[${EXTENSION_NAME}] Error loading settings template:`, err);
     }
 
-    console.log(`[${EXTENSION_NAME}] ST-Toolbox v2.0 initialized successfully with ${allTools.length} available tools.`);
+    console.log(`[${EXTENSION_NAME}] ST-Toolbox (Pi Edition) initialized successfully with ${allTools.length} core tools.`);
 }

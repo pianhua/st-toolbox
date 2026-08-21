@@ -1,0 +1,244 @@
+<div class="st-toolbox-settings">
+    <div class="inline-drawer">
+        <div class="inline-drawer-toggle inline-drawer-header">
+            <b><i class="fa-solid fa-toolbox"></i> ST Toolbox (Pi 极简工具箱)</b>
+            <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
+        </div>
+        <div class="inline-drawer-content">
+            <div class="st-toolbox-container">
+                <!-- Section 1: Allowed Paths -->
+                <div class="st-toolbox-section">
+                    <div class="st-toolbox-section-title">
+                        <span><i class="fa-solid fa-folder-tree"></i> 白名单目录配置</span>
+                        <small>SillyTavern 根目录默认可访问。每行输入一个允许 AI 操作的目录路径（支持 ~ 用户主目录）。</small>
+                    </div>
+
+                    <div class="st-toolbox-quick-bar">
+                        <span>快捷添加：</span>
+                        <button class="menu_button menu_button_icon st-toolbox-quick-add" data-path="~/Desktop">
+                            <i class="fa-solid fa-desktop"></i> 桌面 (~/Desktop)
+                        </button>
+                        <button class="menu_button menu_button_icon st-toolbox-quick-add" data-path="~/Documents">
+                            <i class="fa-solid fa-folder-open"></i> 文档 (~/Documents)
+                        </button>
+                        <button class="menu_button menu_button_icon st-toolbox-quick-add" data-path="~/Downloads">
+                            <i class="fa-solid fa-download"></i> 下载 (~/Downloads)
+                        </button>
+                    </div>
+
+                    <textarea 
+                        id="st-toolbox-allowed-paths" 
+                        class="text_pole textarea_compact st-toolbox-textarea" 
+                        rows="4" 
+                        placeholder="C:\Users\Username\Desktop&#10;D:\Projects&#10;~/Documents"
+                    ></textarea>
+
+                    <div class="st-toolbox-test-bar">
+                        <input id="st-toolbox-test-input" type="text" class="text_pole" placeholder="输入路径测试是否在白名单中..." />
+                        <button id="st-toolbox-test-path-btn" class="menu_button">
+                            <i class="fa-solid fa-magnifying-glass"></i> 测试路径
+                        </button>
+                    </div>
+                    <div id="st-toolbox-test-result" class="st-toolbox-test-result"></div>
+                </div>
+
+                <!-- Section 2: 4 Pi Core Tools -->
+                <div class="st-toolbox-section" style="margin-top: 12px;">
+                    <div class="st-toolbox-section-title">
+                        <span><i class="fa-solid fa-cube"></i> Pi 极简 4 大核心工具权限</span>
+                        <small>极简设计，大幅节省 Prompt 上下文 Token，杜绝 LLM 工具选择混淆。</small>
+                    </div>
+
+                    <div class="st-toolbox-grid">
+                        <div class="st-toolbox-tool-card">
+                            <label><input type="checkbox" class="st-toolbox-tool-toggle" data-tool="read_file" checked /> <b>read_file (读)</b></label>
+                            <small>读取指定文件内容，支持分块与行号</small>
+                        </div>
+                        <div class="st-toolbox-tool-card">
+                            <label><input type="checkbox" class="st-toolbox-tool-toggle" data-tool="write_file" checked /> <b>write_file (写)</b></label>
+                            <small>原子写入/创建文件，自动备份</small>
+                        </div>
+                        <div class="st-toolbox-tool-card">
+                            <label><input type="checkbox" class="st-toolbox-tool-toggle" data-tool="edit_file" checked /> <b>edit_file (改)</b></label>
+                            <small>智能模糊容错代码精准替换</small>
+                        </div>
+                        <div class="st-toolbox-tool-card">
+                            <label><input type="checkbox" class="st-toolbox-tool-toggle" data-tool="execute_bash" checked /> <b>execute_bash (执行)</b></label>
+                            <small>PowerShell/Bash 命令行与检索执行</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 3: Logs -->
+                <div class="st-toolbox-section" style="margin-top: 12px;">
+                    <div class="st-toolbox-section-title">
+                        <span><i class="fa-solid fa-list-check"></i> 实时调用记录</span>
+                        <button id="st-toolbox-clear-logs" class="menu_button menu_button_icon" style="float:right;">
+                            <i class="fa-solid fa-broom"></i> 清空
+                        </button>
+                    </div>
+                    <div id="st-toolbox-logs-list" class="st-toolbox-logs-list"></div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="st-toolbox-actions">
+                    <button id="st-toolbox-save" class="menu_button menu_button_primary">
+                        <i class="fa-solid fa-floppy-disk"></i> 保存配置
+                    </button>
+                    <button id="st-toolbox-reload" class="menu_button">
+                        <i class="fa-solid fa-rotate"></i> 重新加载
+                    </button>
+                </div>
+
+                <div id="st-toolbox-status" class="st-toolbox-status"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.st-toolbox-container {
+    padding: 8px 4px;
+    font-size: 13px;
+}
+
+.st-toolbox-section {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--SmartThemeBorderColor, rgba(255,255,255,0.08));
+    border-radius: 6px;
+    padding: 10px;
+}
+
+.st-toolbox-section-title {
+    margin-bottom: 8px;
+}
+
+.st-toolbox-section-title span {
+    font-weight: bold;
+    font-size: 13px;
+    display: inline-block;
+}
+
+.st-toolbox-section-title small {
+    display: block;
+    opacity: 0.65;
+    margin-top: 2px;
+    font-size: 11px;
+}
+
+.st-toolbox-quick-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+    font-size: 12px;
+}
+
+.st-toolbox-textarea {
+    width: 100%;
+    min-height: 80px;
+    font-family: monospace;
+    font-size: 12px;
+    box-sizing: border-box;
+}
+
+.st-toolbox-test-bar {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.st-toolbox-test-bar input {
+    flex: 1;
+}
+
+.st-toolbox-test-result {
+    margin-top: 6px;
+    font-size: 12px;
+}
+
+.st-toolbox-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 8px;
+    padding: 2px;
+}
+
+.st-toolbox-tool-card {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--SmartThemeBorderColor, rgba(255,255,255,0.08));
+    padding: 8px 10px;
+    border-radius: 6px;
+}
+
+.st-toolbox-tool-card label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 13px;
+}
+
+.st-toolbox-tool-card small {
+    display: block;
+    opacity: 0.65;
+    margin-top: 4px;
+    font-size: 11px;
+}
+
+.st-toolbox-logs-list {
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid var(--SmartThemeBorderColor, rgba(255,255,255,0.08));
+    border-radius: 6px;
+    padding: 6px;
+    background: rgba(0,0,0,0.15);
+    margin-top: 6px;
+}
+
+.st-toolbox-log-item {
+    padding: 6px 8px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    font-size: 12px;
+}
+
+.st-toolbox-log-item:last-child {
+    border-bottom: none;
+}
+
+.st-toolbox-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 12px;
+}
+
+.st-toolbox-status {
+    margin-top: 10px;
+    padding: 8px 12px;
+    border-radius: 4px;
+    display: none;
+    font-size: 12px;
+}
+
+.st-toolbox-status.success {
+    display: block;
+    background-color: rgba(40, 167, 69, 0.2);
+    border: 1px solid rgba(40, 167, 69, 0.5);
+    color: #28a745;
+}
+
+.st-toolbox-status.error {
+    display: block;
+    background-color: rgba(220, 53, 69, 0.2);
+    border: 1px solid rgba(220, 53, 69, 0.5);
+    color: #dc3545;
+}
+
+.st-toolbox-status.info {
+    display: block;
+    background-color: rgba(23, 162, 184, 0.2);
+    border: 1px solid rgba(23, 162, 184, 0.5);
+    color: #17a2b8;
+}
+</style>
