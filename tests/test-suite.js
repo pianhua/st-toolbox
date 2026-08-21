@@ -62,7 +62,10 @@ async function runTests() {
     const validCheck = sandbox.validatePath(path.join(TEST_SANDBOX_DIR, 'test.txt'));
     assert(validCheck.valid === true, 'Valid path inside serverDirectory accepted');
 
-    const invalidCheck = sandbox.validatePath('C:\\Windows\\System32\\drivers\\etc\\hosts');
+    const blacklistTarget = process.platform === 'win32'
+        ? 'C:\\Windows\\System32\\drivers\\etc\\hosts'
+        : '/etc/shadow';
+    const invalidCheck = sandbox.validatePath(blacklistTarget);
     assert(invalidCheck.valid === false, 'Blacklisted system path blocked');
 
     const destructiveRisk = sandbox.checkCommandRisk('rm -rf /');
@@ -122,14 +125,17 @@ async function runTests() {
     const afterEdit = fs.readFileSync(testFile, 'utf-8');
     assert(afterEdit.includes('Antigravity AI'), 'edit_file updated file content');
 
-    // Tool 4: BASH (with UTF-8 Chinese)
+    // Tool 4: BASH (Cross-Platform with UTF-8 Chinese)
     const procRes = await processEngine.executeCommand({ command: 'echo "ST_TOOLBOX_OK"' });
     assert(procRes.exitCode === 0, 'execute_bash exited with code 0');
     assert(procRes.output.includes('ST_TOOLBOX_OK'), 'execute_bash captured output');
 
-    const chineseRes = await processEngine.executeCommand({ command: 'Write-Output "测试中文输出正常，你好SillyTavern"' });
-    assert(chineseRes.exitCode === 0, 'PowerShell Chinese command succeeded');
-    assert(chineseRes.output.includes('你好SillyTavern'), 'PowerShell Chinese UTF-8 verified without garbling');
+    const cmd = process.platform === 'win32'
+        ? 'Write-Output "测试中文输出正常，你好SillyTavern"'
+        : 'echo "测试中文输出正常，你好SillyTavern"';
+    const chineseRes = await processEngine.executeCommand({ command: cmd });
+    assert(chineseRes.exitCode === 0, 'Cross-platform Chinese command succeeded');
+    assert(chineseRes.output.includes('你好SillyTavern'), 'Chinese UTF-8 verified without garbling');
 
     // ----------------------------------------------------
     // Cleanup temporary test sandbox
